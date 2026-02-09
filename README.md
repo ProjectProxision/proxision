@@ -49,7 +49,7 @@ curl -sSL https://raw.githubusercontent.com/ProjectProxision/proxision/main/unin
 
 1. Install Proxision using the quick install command
 2. Open Proxmox web UI at `https://your-server:8006`
-3. Find "Proxision" in the left navigation panel
+3. Find "Proxision" in the right sidebar (collapsible)
 4. Click "Set Model" to configure your AI provider and API key
 5. Start chatting!
 

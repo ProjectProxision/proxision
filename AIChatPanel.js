@@ -90,6 +90,13 @@ Ext.define('PVE.panel.AIChatPanel', {
 				scroller.scrollTo(0, scroller.getMaxPosition().y);
 			}
 		}, 100);
+		// Safety net for long messages that take longer to render
+		Ext.defer(function () {
+			let scroller = messageArea.getScrollable();
+			if (scroller) {
+				scroller.scrollTo(0, scroller.getMaxPosition().y);
+			}
+		}, 400);
 	},
 
 	_setProcessing: function (active) {
@@ -174,12 +181,16 @@ Ext.define('PVE.panel.AIChatPanel', {
 			}
 		} else {
 			let node = (me._shellNodes && me._shellNodes[vmid]) || '';
-			let fullHtml = '<div class="pve-ai-shell-preview">' +
-				'<div class="pve-ai-shell-header">' +
-				'<span class="pve-ai-shell-title"><i class="fa fa-terminal"></i> CT ' + vmid + ' \u2014 Shell</span>' +
+			let fullHtml = '<div class="pve-ai-bubble pve-ai-bubble-assistant">' +
+				'<div class="pve-ai-bubble-header">' +
+				'<i class="fa fa-terminal"></i> CT ' + vmid + ' \u2014 Shell' +
 				'<span class="pve-ai-shell-open" data-vmid="' + vmid + '" data-node="' + Ext.String.htmlEncode(node) + '">Open Shell <i class="fa fa-external-link"></i></span>' +
 				'</div>' +
+				'<div class="pve-ai-bubble-body">' +
+				'<div class="pve-ai-shell-preview">' +
 				'<div class="pve-ai-shell-body">' + bodyHtml + '</div>' +
+				'</div>' +
+				'</div>' +
 				'</div>';
 			messageArea.add({
 				xtype: 'component',
@@ -594,7 +605,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 			},
 			cls: 'pve-ai-chat-messages',
 			style: {
-				paddingBottom: '12px',
+				paddingBottom: '6px',
 			},
 			layout: {
 				type: 'vbox',
