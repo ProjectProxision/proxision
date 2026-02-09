@@ -41,7 +41,7 @@ curl -sSL https://raw.githubusercontent.com/ProjectProxision/proxision/main/unin
 
 ## Requirements
 
-- Proxmox VE 7.x or 8.x
+- Proxmox VE 9.x or 8.x
 - Python 3.x
 - API key from one of the supported AI providers
 
