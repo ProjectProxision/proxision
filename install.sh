@@ -25,7 +25,7 @@ NC='\033[0m'
 # Branch / repo configuration
 # Each branch's install.sh sets its own default here.
 # Override with: PROXISION_BRANCH=dev curl ... | bash
-BRANCH="${PROXISION_BRANCH:-dev}"
+BRANCH="${PROXISION_BRANCH:-main}"
 REPO_URL="${PROXISION_REPO:-https://raw.githubusercontent.com/ProjectProxision/proxision/${BRANCH}}"
 
 INSTALL_DIR="/opt/proxision"
