@@ -857,24 +857,6 @@ Ext.define('PVE.panel.AIChatPanel', {
 			},
 		});
 
-		let newChatButton = Ext.createWidget('button', {
-			baseCls: 'x-btn',
-			iconCls: 'fa fa-plus',
-			tooltip: 'New Chat',
-			handler: function () {
-				me.clearChat();
-			},
-		});
-
-		let historyButton = Ext.createWidget('button', {
-			baseCls: 'x-btn',
-			iconCls: 'fa fa-history',
-			tooltip: 'Chat History',
-			handler: function () {
-				me._showChatHistory();
-			},
-		});
-
 		let modelButton = Ext.createWidget('button', {
 			baseCls: 'x-btn',
 			iconCls: 'fa fa-cogs',
@@ -898,6 +880,30 @@ Ext.define('PVE.panel.AIChatPanel', {
 		});
 
 		Ext.apply(me, {
+			header: {
+				items: [
+					{
+						xtype: 'button',
+						baseCls: 'x-btn',
+						iconCls: 'fa fa-plus',
+						tooltip: 'New Chat',
+						margin: '0 6 0 0',
+						handler: function () {
+							me.clearChat();
+						},
+					},
+					{
+						xtype: 'button',
+						baseCls: 'x-btn',
+						iconCls: 'fa fa-history',
+						tooltip: 'Chat History',
+						margin: '0 4 0 0',
+						handler: function () {
+							me._showChatHistory();
+						},
+					},
+				],
+			},
 			items: [
 				messageArea,
 				{
@@ -923,10 +929,6 @@ Ext.define('PVE.panel.AIChatPanel', {
 								align: 'middle',
 							},
 							items: [
-								newChatButton,
-								{ xtype: 'component', width: 4 },
-								historyButton,
-								{ xtype: 'component', width: 4 },
 								modelButton,
 								{ xtype: 'component', flex: 1 },
 								sendButton,
