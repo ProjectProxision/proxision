@@ -1,0 +1,12 @@
+[Unit]
+Description=Proxmox AI Chat Proxy
+After=network.target pveproxy.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/pve-ai-proxy.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
