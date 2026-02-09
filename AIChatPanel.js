@@ -55,25 +55,58 @@ Ext.define('PVE.panel.AIChatPanel', {
 		let me = this;
 		let messageArea = me.down('#chatMessages');
 		if (!messageArea) return;
+		let doScroll = function () {
+			let scroller = messageArea.getScrollable();
+			if (scroller) {
+				scroller.scrollTo(0, scroller.getMaxPosition().y);
+			}
+		};
 		Ext.defer(function () {
 			messageArea.updateLayout();
-			let scroller = messageArea.getScrollable();
-			if (scroller) {
-				scroller.scrollTo(0, scroller.getMaxPosition().y);
-			}
-		}, 100);
-		Ext.defer(function () {
-			let scroller = messageArea.getScrollable();
-			if (scroller) {
-				scroller.scrollTo(0, scroller.getMaxPosition().y);
-			}
-		}, 400);
-		Ext.defer(function () {
-			let scroller = messageArea.getScrollable();
-			if (scroller) {
-				scroller.scrollTo(0, scroller.getMaxPosition().y);
-			}
-		}, 800);
+			doScroll();
+		}, 50);
+		Ext.defer(doScroll, 200);
+		Ext.defer(doScroll, 500);
+	},
+
+	_resetShellState: function () {
+		let me = this;
+		me._createdResources = [];
+		me._shellEntries = {};
+		me._shellNodes = {};
+		me._shellIsHost = {};
+		if (me._shellOutputTimer) {
+			clearTimeout(me._shellOutputTimer);
+			me._shellOutputTimer = null;
+		}
+	},
+
+	_showWelcome: function () {
+		let me = this;
+		let messageArea = me.down('#chatMessages');
+		messageArea.removeAll();
+		messageArea.add({
+			xtype: 'component',
+			itemId: 'welcomeBox',
+			cls: 'pve-ai-chat-welcome',
+			html: '<div class="pve-ai-chat-welcome-inner">' +
+				'<div class="pve-ai-chat-welcome-icon">' +
+				'<i class="fa fa-comments fa-3x"></i>' +
+				'</div>' +
+				'<h2>Proxision</h2>' +
+				'<p>Ask me anything about your Proxmox environment.<br>' +
+				'I can help you manage VMs, containers, storage, and more.</p>' +
+				'</div>',
+		});
+	},
+
+	_hideWelcome: function () {
+		let me = this;
+		let welcome = me.down('#welcomeBox');
+		if (welcome) {
+			let messageArea = me.down('#chatMessages');
+			messageArea.remove(welcome);
+		}
 	},
 
 	addBubble: function (role, text) {
@@ -181,10 +214,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 				bodyEl.dom.innerHTML = bodyHtml;
 				bodyEl.dom.scrollTop = bodyEl.dom.scrollHeight;
 			}
-			let scroller = messageArea.getScrollable();
-			if (scroller) {
-				scroller.scrollTo(0, scroller.getMaxPosition().y);
-			}
+			me._scrollToBottom();
 		} else {
 			let node = (me._shellNodes && me._shellNodes[vmid]) || '';
 			let isHost = (me._shellIsHost && me._shellIsHost[vmid]);
@@ -396,23 +426,12 @@ Ext.define('PVE.panel.AIChatPanel', {
 			return;
 		}
 
+		me._hideWelcome();
 		me.chatHistory.push({ role: 'user', content: text });
 		me.addBubble('user', text);
 		input.setValue('');
 
-		let welcome = me.down('#welcomeBox');
-		if (welcome) {
-			welcome.setHidden(true);
-		}
-
-		me._createdResources = [];
-		me._shellEntries = {};
-		me._shellNodes = {};
-		me._shellIsHost = {};
-		if (me._shellOutputTimer) {
-			clearTimeout(me._shellOutputTimer);
-			me._shellOutputTimer = null;
-		}
+		me._resetShellState();
 		let loadingId = 'ai-loading-' + Ext.id();
 		me._currentLoadingId = loadingId;
 		let messageArea = me.down('#chatMessages');
@@ -626,16 +645,10 @@ Ext.define('PVE.panel.AIChatPanel', {
 
 		me.chatHistory = chat.messages || [];
 		me._currentChatId = chat.id;
-		me._createdResources = [];
-		me._shellEntries = {};
-		me._shellNodes = {};
-		me._shellIsHost = {};
+		me._resetShellState();
 
 		let messageArea = me.down('#chatMessages');
 		messageArea.removeAll();
-
-		let welcome = me.down('#welcomeBox');
-		if (welcome) welcome.setHidden(true);
 
 		for (let i = 0; i < me.chatHistory.length; i++) {
 			let msg = me.chatHistory[i];
@@ -646,9 +659,17 @@ Ext.define('PVE.panel.AIChatPanel', {
 	},
 
 	_deleteChat: function (chatId) {
+		let me = this;
 		let chats = JSON.parse(localStorage.getItem('pve-ai-chats') || '[]');
 		chats = chats.filter(function (c) { return c.id !== chatId; });
 		localStorage.setItem('pve-ai-chats', JSON.stringify(chats));
+
+		if (me._currentChatId === chatId) {
+			me.chatHistory = [];
+			me._currentChatId = null;
+			me._resetShellState();
+			me._showWelcome();
+		}
 	},
 
 	_showChatHistory: function () {
@@ -659,9 +680,9 @@ Ext.define('PVE.panel.AIChatPanel', {
 		if (chats.length === 0) {
 			items.push({
 				xtype: 'component',
-				padding: 20,
-				style: { textAlign: 'center', opacity: 0.6 },
-				html: 'No saved chats yet.',
+				padding: '30 20',
+				style: { textAlign: 'center', opacity: 0.5, fontSize: '12px' },
+				html: '<i class="fa fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;opacity:0.4"></i>No saved chats yet.',
 			});
 		} else {
 			for (let i = 0; i < chats.length; i++) {
@@ -669,18 +690,24 @@ Ext.define('PVE.panel.AIChatPanel', {
 					let d = new Date(chat.timestamp);
 					let dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 					let msgCount = (chat.messages || []).length;
+					let isActive = me._currentChatId === chat.id;
 					items.push({
 						xtype: 'container',
 						cls: 'pve-ai-history-item',
-						padding: '8 12',
-						style: { cursor: 'pointer', borderBottom: '1px solid rgba(128,128,128,0.15)' },
+						padding: '8 14 8 12',
+						style: {
+							cursor: 'pointer',
+							borderBottom: '1px solid rgba(128,128,128,0.12)',
+							background: isActive ? 'rgba(56,146,212,0.1)' : 'transparent',
+						},
 						layout: { type: 'hbox', align: 'middle' },
 						items: [
 							{
 								xtype: 'component',
 								flex: 1,
-								html: '<div style="font-size:12px;font-weight:500;margin-bottom:2px">' + Ext.String.htmlEncode(chat.title) + '</div>' +
-									'<div style="font-size:10px;opacity:0.6">' + dateStr + ' \u00b7 ' + msgCount + ' messages</div>',
+								html: '<div style="font-size:12px;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+									Ext.String.htmlEncode(chat.title) + '</div>' +
+									'<div style="font-size:10px;opacity:0.5">' + dateStr + ' \u00b7 ' + msgCount + ' messages</div>',
 								listeners: {
 									afterrender: function (comp) {
 										comp.el.on('click', function () {
@@ -697,8 +724,8 @@ Ext.define('PVE.panel.AIChatPanel', {
 								baseCls: 'x-btn',
 								margin: '0 0 0 8',
 								handler: function (btn) {
-									me._deleteChat(chat.id);
 									let win = btn.up('window');
+									me._deleteChat(chat.id);
 									if (win) win.close();
 									me._showChatHistory();
 								},
@@ -713,24 +740,28 @@ Ext.define('PVE.panel.AIChatPanel', {
 			title: 'Chat History',
 			iconCls: 'fa fa-history',
 			width: 380,
-			height: 400,
+			height: 420,
 			modal: true,
 			layout: 'fit',
 			border: false,
 			items: [{
 				xtype: 'container',
+				cls: 'pve-ai-history-scroll',
 				scrollable: { y: 'scroll', x: false },
-				padding: '4 6 4 0',
 				layout: { type: 'vbox', align: 'stretch' },
 				items: items,
 			}],
 			buttons: [{
-				text: 'Clear All History',
+				text: 'Clear All',
 				iconCls: 'fa fa-trash',
 				handler: function (btn) {
 					Ext.Msg.confirm('Clear History', 'Delete all saved chats?', function (choice) {
 						if (choice === 'yes') {
 							localStorage.removeItem('pve-ai-chats');
+							me.chatHistory = [];
+							me._currentChatId = null;
+							me._resetShellState();
+							me._showWelcome();
 							btn.up('window').close();
 						}
 					});
@@ -756,20 +787,8 @@ Ext.define('PVE.panel.AIChatPanel', {
 		me._saveChatToHistory();
 		me.chatHistory = [];
 		me._currentChatId = null;
-		me._createdResources = [];
-		me._shellEntries = {};
-		me._shellNodes = {};
-		me._shellIsHost = {};
-		if (me._shellOutputTimer) {
-			clearTimeout(me._shellOutputTimer);
-			me._shellOutputTimer = null;
-		}
-		let messageArea = me.down('#chatMessages');
-		messageArea.removeAll();
-		let welcome = me.down('#welcomeBox');
-		if (welcome) {
-			welcome.setHidden(false);
-		}
+		me._resetShellState();
+		me._showWelcome();
 	},
 
 	initComponent: function () {
@@ -805,16 +824,15 @@ Ext.define('PVE.panel.AIChatPanel', {
 			},
 			items: [
 				{
-					xtype: 'container',
+					xtype: 'component',
 					itemId: 'welcomeBox',
 					cls: 'pve-ai-chat-welcome',
-					padding: '20 25 20 15',
 					html: '<div class="pve-ai-chat-welcome-inner">' +
 						'<div class="pve-ai-chat-welcome-icon">' +
 						'<i class="fa fa-comments fa-3x"></i>' +
 						'</div>' +
 						'<h2>Proxision</h2>' +
-						'<p>Ask me anything about your Proxmox environment. ' +
+						'<p>Ask me anything about your Proxmox environment.<br>' +
 						'I can help you manage VMs, containers, storage, and more.</p>' +
 						'</div>',
 				},
@@ -883,14 +901,8 @@ Ext.define('PVE.panel.AIChatPanel', {
 			items: [
 				messageArea,
 				{
-					xtype: 'toolbar',
-					height: 1,
-					padding: 0,
-					margin: 0,
-					items: [],
-				},
-				{
 					xtype: 'panel',
+					cls: 'pve-ai-input-panel',
 					border: false,
 					bodyPadding: '8 10 10 10',
 					bodyCls: 'pve-ai-chat-input-bar',
@@ -905,16 +917,16 @@ Ext.define('PVE.panel.AIChatPanel', {
 							xtype: 'container',
 							baseCls: 'x-plain',
 							border: false,
-							margin: '5 0 0 0',
+							margin: '6 0 0 0',
 							layout: {
 								type: 'hbox',
 								align: 'middle',
 							},
 							items: [
 								newChatButton,
-								{ xtype: 'component', width: 5 },
+								{ xtype: 'component', width: 4 },
 								historyButton,
-								{ xtype: 'component', width: 5 },
+								{ xtype: 'component', width: 4 },
 								modelButton,
 								{ xtype: 'component', flex: 1 },
 								sendButton,

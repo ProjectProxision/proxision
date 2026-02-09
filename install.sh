@@ -259,39 +259,41 @@ deploy_css() {
 
 /* ─── Proxision AI Chat Sidebar ─── DO NOT EDIT ─── */
 
-/* Chat messages container */
-.pve-ai-chat-messages { padding-top: 8px; padding-bottom: 8px; }
+/* ── Chat messages scroll area ── */
+.pve-ai-chat-messages {
+  padding: 10px 0 12px 0;
+  min-height: 0;
+}
 .pve-ai-chat-messages::-webkit-scrollbar { width: 6px; }
 .pve-ai-chat-messages::-webkit-scrollbar-track { background: transparent; }
-.pve-ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
-.pve-ai-chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+.pve-ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 3px; }
+.pve-ai-chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.45); }
 
-/* Welcome screen */
-.pve-ai-chat-welcome { text-align: center; }
+/* ── Welcome screen ── */
+.pve-ai-chat-welcome { text-align: center; padding: 30px 20px 20px 20px; }
 .pve-ai-chat-welcome-inner h2 { font-size: 16px; font-weight: 600; color: inherit; margin: 10px 0 6px 0; }
-.pve-ai-chat-welcome-inner p { font-size: 12px; opacity: 0.7; line-height: 1.5; margin: 0 0 16px 0; }
-.pve-ai-chat-welcome-icon { color: #3892d4; margin-bottom: 4px; }
+.pve-ai-chat-welcome-inner p { font-size: 12px; opacity: 0.65; line-height: 1.6; margin: 0; }
+.pve-ai-chat-welcome-icon { color: #3892d4; margin-bottom: 4px; opacity: 0.85; }
 
-/* Input bar */
+/* ── Input bar ── */
 .pve-ai-chat-input-bar { border: none; }
+.pve-ai-input-panel { border-top: 1px solid rgba(128,128,128,0.2) !important; }
 
-/* Chat bubbles — shared */
-.pve-ai-bubble-wrap { padding: 4px 14px 4px 12px; }
-.pve-ai-bubble-wrap:first-child { padding-top: 6px; }
+/* ── Chat bubbles — shared ── */
+.pve-ai-bubble-wrap { padding: 3px 14px 3px 12px; }
 .pve-ai-bubble { padding: 8px 12px; border-radius: 4px; max-width: 92%; word-wrap: break-word; overflow-wrap: break-word; }
-.pve-ai-bubble-header { font-size: 11px; margin-bottom: 4px; opacity: 0.7; display: flex; align-items: center; }
-.pve-ai-bubble-header i { margin-right: 4px; }
+.pve-ai-bubble-header { font-size: 11px; margin-bottom: 4px; opacity: 0.65; display: flex; align-items: center; gap: 4px; }
 .pve-ai-bubble-body { font-size: 13px; line-height: 1.5; }
 .pve-ai-loading-body { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* User bubble */
+/* ── User bubble ── */
 .pve-ai-bubble-user { background-color: #3892d4; color: #fff; margin-left: auto; border-radius: 4px 4px 0 4px; }
-.pve-ai-bubble-user .pve-ai-bubble-header { opacity: 0.85; }
+.pve-ai-bubble-user .pve-ai-bubble-header { opacity: 0.8; }
 
-/* Assistant bubble */
-.pve-ai-bubble-assistant { background: rgba(128,128,128,0.13); color: inherit; margin-right: auto; border-radius: 4px 4px 4px 0; }
+/* ── Assistant bubble ── */
+.pve-ai-bubble-assistant { background: rgba(128,128,128,0.12); color: inherit; margin-right: auto; border-radius: 4px 4px 4px 0; }
 
-/* Markdown in bubbles */
+/* ── Markdown inside bubbles ── */
 .pve-ai-bubble-body pre.pve-ai-code { background: rgba(0,0,0,0.07); border-radius: 4px; padding: 8px 10px; margin: 6px 0; overflow-x: auto; white-space: pre; font-size: 12px; line-height: 1.4; }
 .pve-ai-bubble-body code.pve-ai-icode { background: rgba(0,0,0,0.07); border-radius: 3px; padding: 1px 5px; font-size: 12px; }
 .pve-ai-bubble-body pre.pve-ai-code code { background: none; padding: 0; font-size: inherit; }
@@ -299,9 +301,17 @@ deploy_css() {
 .pve-ai-bubble-body a.pve-ai-link { color: #3892d4; text-decoration: none; border-bottom: 1px dotted #3892d4; }
 .pve-ai-bubble-body a.pve-ai-link:hover { color: #2a6fa8; border-bottom-style: solid; }
 
-/* Shell preview — nested inside assistant bubble */
-.pve-ai-shell-preview { background: #1e1e1e; border-radius: 4px; overflow: hidden; border: 1px solid rgba(128,128,128,0.2); margin-top: 2px; }
-.pve-ai-shell-body { padding: 8px 10px; max-height: 200px; overflow-y: auto; overflow-x: hidden; font-family: 'Menlo','Consolas','DejaVu Sans Mono','Liberation Mono',monospace; font-size: 11.5px; line-height: 1.45; }
+/* ── Shell preview — nested inside assistant bubble ── */
+.pve-ai-shell-preview { background: #1e1e1e; border-radius: 4px; overflow: hidden; border: 1px solid rgba(128,128,128,0.2); margin-top: 4px; }
+.pve-ai-shell-body {
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: 'Menlo','Consolas','DejaVu Sans Mono','Liberation Mono',monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
 .pve-ai-shell-body::-webkit-scrollbar { width: 5px; }
 .pve-ai-shell-body::-webkit-scrollbar-track { background: #1e1e1e; }
 .pve-ai-shell-body::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
@@ -317,19 +327,24 @@ deploy_css() {
 .pve-ai-shell-cursor { color: #c0c0c0; font-size: 10px; line-height: 1; animation: pve-ai-blink 1s step-end infinite; }
 @keyframes pve-ai-blink { 50% { opacity: 0; } }
 
-/* Open Shell link in bubble header */
+/* ── Open Shell link ── */
 .pve-ai-shell-open { margin-left: auto; color: #5ba0d0; font-size: 11px; cursor: pointer; padding: 2px 8px; border-radius: 3px; transition: background 0.15s; }
 .pve-ai-shell-open:hover { background: rgba(91,160,208,0.15); color: #7dbde8; }
 .pve-ai-shell-open i { margin-left: 3px; font-size: 10px; }
 
-/* Stop button */
+/* ── Send / Stop buttons ── */
+.pve-ai-send-btn { border-radius: 3px; }
 .pve-ai-stop-btn { background-color: #3892d4 !important; color: #fff !important; border-color: #3078b4 !important; border-radius: 3px; }
 .pve-ai-stop-btn .x-btn-inner { color: #fff !important; }
 .pve-ai-stop-btn .x-btn-icon-el { color: #fff !important; }
 
-/* Chat history items */
-.pve-ai-history-item { padding-right: 16px !important; }
+/* ── Chat history window ── */
+.pve-ai-history-item { transition: background 0.12s; }
 .pve-ai-history-item:hover { background: rgba(56,146,212,0.08); }
+.pve-ai-history-scroll::-webkit-scrollbar { width: 6px; }
+.pve-ai-history-scroll::-webkit-scrollbar-track { background: transparent; }
+.pve-ai-history-scroll::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 3px; }
+.pve-ai-history-scroll::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.45); }
 
 /* ─── End Proxision CSS ─── */
 PROXISION_CSS
