@@ -131,8 +131,27 @@ Perform actions by including a tool call in your response using this EXACT forma
 ### Container Actions
 - create_container: params: hostname, cores, memory (MB), disk_size (GB), storage, template (full volid e.g. "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"), net_bridge (default vmbr0), password, privileged (true for Docker-in-LXC/NFS — default false), features (e.g. "nesting=1" for Docker-in-LXC), nameserver (DNS IP), ip (CIDR like "192.168.1.50/24" or "dhcp" — default "dhcp"), gw (gateway IP, required if static ip)
 - start_container / stop_container: params: vmid
+- suspend_container / resume_container: params: vmid — suspend freezes execution in place; resume unfreezes it
 - delete_container: params: vmid (must be stopped first)
 - exec_container: params: vmid, command — run a bash command inside a RUNNING container as root. Returns stdout, stderr, exit_code. Max 300s timeout.
+
+### Container Status & Config
+- get_container_status: params: vmid — detailed status including CPU, memory, uptime, disk usage
+- get_container_config: params: vmid — full current configuration (cores, memory, network, mounts, etc.)
+- set_container_config: params: vmid, plus any config keys to change: cores, memory, swap, hostname, nameserver, searchdomain, net0-net3, onboot, description, tags, features, cpulimit, cpuunits, protection, tty, startup, mp0-mp3, etc. Use "delete" param (comma-separated key names) to remove config keys. Container may need restart for some changes to apply.
+
+### Container Disk
+- resize_container_disk: params: vmid, disk (e.g. "rootfs", "mp0"), size (e.g. "+5G" for relative or "20G" for absolute)
+
+### Container Snapshots
+- snapshot_container: params: vmid, snapname, description (optional) — create a named snapshot
+- list_container_snapshots: params: vmid — list all snapshots for a container
+- rollback_container_snapshot: params: vmid, snapname — rollback to a snapshot (container must be stopped)
+- delete_container_snapshot: params: vmid, snapname — delete a snapshot
+
+### Container Clone & Migrate
+- clone_container: params: vmid, newid (target VMID), hostname (optional), full (1 for full clone, 0 for linked — default 1), storage (optional target storage), description (optional). Returns new vmid.
+- migrate_container: params: vmid, target (target node name) — migrate container to another cluster node. Container should be stopped for offline migration.
 
 ### Template Actions
 - list_available_templates: no params — shows all downloadable CT templates
@@ -226,7 +245,8 @@ Include multiple <tool_call> tags in one response — they execute in order. Aft
 
 ## Limitations
 - You CANNOT run commands inside VMs (only containers via exec_container).
-- You CANNOT modify existing VM or container configs (resize, add disks, change network).
+- You CANNOT modify existing VM configs (resize, add disks, change network) — only container configs can be modified.
+- Some container config changes (e.g. memory, cores) may require a restart to take effect. Inform the user when this applies.
 - Do NOT claim failure unless the tool result explicitly says success=false."""
 
 
@@ -396,7 +416,8 @@ class PVEHelper:
 
     def execute(self, action, params):
         """Execute a tool call and return the result."""
-        read_only = ('exec_container', 'list_vms', 'list_containers', 'get_resources', 'list_available_templates')
+        read_only = ('exec_container', 'list_vms', 'list_containers', 'get_resources', 'list_available_templates',
+                     'get_container_status', 'get_container_config', 'list_container_snapshots')
         if action not in read_only:
             self._ctx_cache = None
         n = self.node
@@ -564,6 +585,170 @@ class PVEHelper:
             try:
                 self.pvesh('delete', '/nodes/' + n + '/lxc/' + str(vmid), timeout=120)
                 return {'success': True, 'message': 'Container ' + str(vmid) + ' deleted successfully'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'get_container_status':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            try:
+                data = self.pvesh('get', '/nodes/' + n + '/lxc/' + str(vmid) + '/status/current')
+                return {'success': True, 'data': data}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'get_container_config':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            try:
+                data = self.pvesh('get', '/nodes/' + n + '/lxc/' + str(vmid) + '/config')
+                return {'success': True, 'data': data}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'set_container_config':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            allowed_keys = {
+                'cores', 'memory', 'swap', 'hostname', 'nameserver', 'searchdomain',
+                'net0', 'net1', 'net2', 'net3', 'onboot', 'description', 'tags',
+                'features', 'cpulimit', 'cpuunits', 'protection', 'tty', 'startup',
+                'mp0', 'mp1', 'mp2', 'mp3', 'delete',
+            }
+            p = {}
+            for k, v in params.items():
+                if k == 'vmid':
+                    continue
+                if k in allowed_keys:
+                    p[k] = v
+            if not p:
+                return {'success': False, 'error': 'No valid config keys provided. Allowed: ' + ', '.join(sorted(allowed_keys - {'delete'}))}
+            try:
+                self.pvesh('set', '/nodes/' + n + '/lxc/' + str(vmid) + '/config', p)
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' configuration updated'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'resize_container_disk':
+            vmid = params.get('vmid')
+            disk = params.get('disk', 'rootfs')
+            size = params.get('size')
+            if not vmid or not size:
+                return {'success': False, 'error': 'vmid and size are required'}
+            try:
+                self.pvesh('set', '/nodes/' + n + '/lxc/' + str(vmid) + '/resize', {'disk': disk, 'size': size})
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' disk "' + disk + '" resized to ' + str(size)}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'clone_container':
+            vmid = params.get('vmid')
+            newid = params.get('newid')
+            if not vmid or not newid:
+                return {'success': False, 'error': 'vmid and newid are required'}
+            p = {'newid': int(newid)}
+            if params.get('hostname'):
+                p['hostname'] = params['hostname']
+            if params.get('description'):
+                p['description'] = params['description']
+            if params.get('storage'):
+                p['storage'] = params['storage']
+            p['full'] = int(params.get('full', 1))
+            try:
+                result = self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/clone', p, timeout=600)
+                upid = result if isinstance(result, str) and result.startswith('UPID:') else None
+                if upid:
+                    success, status = self._poll_task(upid, timeout=600)
+                    if not success:
+                        exitstatus = status.get('exitstatus', 'unknown error') if isinstance(status, dict) else str(status)
+                        return {'success': False, 'error': 'Clone failed: ' + exitstatus}
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' cloned to ' + str(newid), 'vmid': int(newid)}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'snapshot_container':
+            vmid = params.get('vmid')
+            snapname = params.get('snapname')
+            if not vmid or not snapname:
+                return {'success': False, 'error': 'vmid and snapname are required'}
+            p = {'snapname': snapname}
+            if params.get('description'):
+                p['description'] = params['description']
+            try:
+                self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/snapshot', p, timeout=120)
+                return {'success': True, 'message': 'Snapshot "' + snapname + '" created for container ' + str(vmid)}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'list_container_snapshots':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            try:
+                data = self.pvesh('get', '/nodes/' + n + '/lxc/' + str(vmid) + '/snapshot')
+                return {'success': True, 'data': data}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'rollback_container_snapshot':
+            vmid = params.get('vmid')
+            snapname = params.get('snapname')
+            if not vmid or not snapname:
+                return {'success': False, 'error': 'vmid and snapname are required'}
+            try:
+                self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/snapshot/' + str(snapname) + '/rollback', timeout=120)
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' rolled back to snapshot "' + snapname + '"'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'delete_container_snapshot':
+            vmid = params.get('vmid')
+            snapname = params.get('snapname')
+            if not vmid or not snapname:
+                return {'success': False, 'error': 'vmid and snapname are required'}
+            try:
+                self.pvesh('delete', '/nodes/' + n + '/lxc/' + str(vmid) + '/snapshot/' + str(snapname), timeout=120)
+                return {'success': True, 'message': 'Snapshot "' + snapname + '" deleted from container ' + str(vmid)}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'migrate_container':
+            vmid = params.get('vmid')
+            target = params.get('target')
+            if not vmid or not target:
+                return {'success': False, 'error': 'vmid and target are required'}
+            try:
+                result = self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/migrate', {'target': target}, timeout=600)
+                upid = result if isinstance(result, str) and result.startswith('UPID:') else None
+                if upid:
+                    success, status = self._poll_task(upid, timeout=600)
+                    if not success:
+                        exitstatus = status.get('exitstatus', 'unknown error') if isinstance(status, dict) else str(status)
+                        return {'success': False, 'error': 'Migration failed: ' + exitstatus}
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' migrated to node "' + target + '"'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'suspend_container':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            try:
+                self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/status/suspend', timeout=120)
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' suspended'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'resume_container':
+            vmid = params.get('vmid')
+            if not vmid:
+                return {'success': False, 'error': 'vmid is required'}
+            try:
+                self.pvesh('create', '/nodes/' + n + '/lxc/' + str(vmid) + '/status/resume', timeout=120)
+                return {'success': True, 'message': 'Container ' + str(vmid) + ' resumed'}
             except Exception as e:
                 return {'success': False, 'error': str(e)}
 
@@ -871,7 +1056,8 @@ class AIProxyHandler(BaseHTTPRequestHandler):
                     if result.get('success') and result.get('vmid'):
                         ctype = 'ct' if 'container' in action else 'vm'
                         emit({'type': 'status', 'message': self._describe_action(action, params), 'created_vmid': result['vmid'], 'created_type': ctype})
-                    if not result.get('success') and action in ('create_vm', 'create_container', 'start_vm', 'start_container', 'download_template', 'download_iso'):
+                    if not result.get('success') and action in ('create_vm', 'create_container', 'start_vm', 'start_container', 'download_template', 'download_iso',
+                                                                   'clone_container', 'rollback_container_snapshot', 'migrate_container'):
                         failed_critical = True
                 except json.JSONDecodeError:
                     all_results.append({'action': 'unknown', 'result': {'success': False, 'error': 'Malformed tool call'}})
@@ -1019,11 +1205,14 @@ class AIProxyHandler(BaseHTTPRequestHandler):
             # Extract common string params for other actions
             for key in ('hostname', 'name', 'template', 'storage', 'filename',
                         'url', 'ostype', 'password', 'ostemplate', 'net0',
-                        'content', 'description'):
+                        'content', 'description', 'snapname', 'target', 'disk',
+                        'size', 'tags', 'features', 'nameserver', 'searchdomain',
+                        'startup', 'delete', 'net_bridge'):
                 km = re.search(r'"' + key + r'"\s*:\s*"([^"]*)"', s)
                 if km:
                     params[key] = km.group(1)
-            for key in ('memory', 'disk', 'cores', 'swap', 'rootfs'):
+            for key in ('memory', 'disk', 'cores', 'swap', 'rootfs',
+                        'newid', 'onboot', 'protection', 'tty', 'cpuunits', 'full'):
                 km = re.search(r'"' + key + r'"\s*:\s*(\d+)', s)
                 if km:
                     params[key] = int(km.group(1))
@@ -1132,6 +1321,30 @@ class AIProxyHandler(BaseHTTPRequestHandler):
             return 'Fetching available templates...'
         if action == 'get_resources':
             return 'Fetching cluster resources...'
+        if action == 'get_container_status':
+            return 'Fetching status for container ' + str(params.get('vmid', '')) + '...'
+        if action == 'get_container_config':
+            return 'Fetching config for container ' + str(params.get('vmid', '')) + '...'
+        if action == 'set_container_config':
+            return 'Updating config for container ' + str(params.get('vmid', '')) + '...'
+        if action == 'resize_container_disk':
+            return 'Resizing disk "' + params.get('disk', 'rootfs') + '" on container ' + str(params.get('vmid', '')) + '...'
+        if action == 'clone_container':
+            return 'Cloning container ' + str(params.get('vmid', '')) + ' to ' + str(params.get('newid', '')) + '...'
+        if action == 'snapshot_container':
+            return 'Creating snapshot "' + params.get('snapname', '') + '" for container ' + str(params.get('vmid', '')) + '...'
+        if action == 'list_container_snapshots':
+            return 'Listing snapshots for container ' + str(params.get('vmid', '')) + '...'
+        if action == 'rollback_container_snapshot':
+            return 'Rolling back container ' + str(params.get('vmid', '')) + ' to snapshot "' + params.get('snapname', '') + '"...'
+        if action == 'delete_container_snapshot':
+            return 'Deleting snapshot "' + params.get('snapname', '') + '" from container ' + str(params.get('vmid', '')) + '...'
+        if action == 'migrate_container':
+            return 'Migrating container ' + str(params.get('vmid', '')) + ' to node "' + params.get('target', '') + '"...'
+        if action == 'suspend_container':
+            return 'Suspending container ' + str(params.get('vmid', '')) + '...'
+        if action == 'resume_container':
+            return 'Resuming container ' + str(params.get('vmid', '')) + '...'
         return 'Executing ' + action + '...'
 
     def _call_ai(self, model, api_key, messages):
