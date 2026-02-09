@@ -178,6 +178,12 @@ Perform actions by including a tool call in your response using this EXACT forma
 - start_vm / stop_vm: params: vmid
 - delete_vm: params: vmid (must be stopped first)
 
+### Host Actions
+- exec_host: params: command — run a bash command directly on the Proxmox HOST as root. Use this for host-level tasks: checking host services, editing host config files, managing networking, installing host packages, checking logs, firewall rules, etc. Same best practices as exec_container. Max 300s timeout. NO interactive commands.
+
+### Notes / Documentation
+- save_notes: params: vmid, notes (text), kind ("ct" or "vm") — append important notes (access info, credentials, setup details) to the VM/CT description field visible in the Proxmox UI. ALWAYS use this after finishing a setup to save access details.
+
 ### Info
 - list_vms / list_containers / get_resources: no params
 
@@ -242,9 +248,11 @@ Include multiple <tool_call> tags in one response — they execute in order. Aft
 10. At the end, ALWAYS provide: IP address, port, credentials, and how to connect/use the service.
 11. If no templates are available, download one before creating a container.
 12. If a container creation fails, use delete_container to clean up, then retry.
+13. After completing ANY container/VM setup, ALWAYS use save_notes to store access details (IP, port, credentials, service URL, how to connect) in the VM/CT notes. This ensures the user can always find the info in the Proxmox UI later.
+14. For host-level tasks (checking logs, editing host configs, managing host services, networking), use exec_host instead of telling the user to SSH in manually.
 
 ## Limitations
-- You CANNOT run commands inside VMs (only containers via exec_container).
+- You CANNOT run commands inside VMs (only containers via exec_container and only on the host via exec_host).
 - You CANNOT modify existing VM configs (resize, add disks, change network) — only container configs can be modified.
 - Some container config changes (e.g. memory, cores) may require a restart to take effect. Inform the user when this applies.
 - Do NOT claim failure unless the tool result explicitly says success=false."""
@@ -416,7 +424,7 @@ class PVEHelper:
 
     def execute(self, action, params):
         """Execute a tool call and return the result."""
-        read_only = ('exec_container', 'list_vms', 'list_containers', 'get_resources', 'list_available_templates',
+        read_only = ('exec_container', 'exec_host', 'list_vms', 'list_containers', 'get_resources', 'list_available_templates',
                      'get_container_status', 'get_container_config', 'list_container_snapshots')
         if action not in read_only:
             self._ctx_cache = None
@@ -573,6 +581,51 @@ class PVEHelper:
                 }
             except subprocess.TimeoutExpired:
                 return {'success': False, 'error': 'Command timed out after 300s'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'exec_host':
+            command = params.get('command')
+            if not command:
+                return {'success': False, 'error': 'command is required'}
+            try:
+                result = subprocess.run(
+                    ['bash', '-c', command],
+                    capture_output=True, text=True, timeout=300,
+                )
+                stdout = result.stdout
+                if len(stdout) > 3000:
+                    stdout = '...(truncated)...\n' + stdout[-3000:]
+                stderr = result.stderr
+                if len(stderr) > 1500:
+                    stderr = '...(truncated)...\n' + stderr[-1500:]
+                return {
+                    'success': result.returncode == 0,
+                    'output': stdout,
+                    'stderr': stderr,
+                    'exit_code': result.returncode,
+                }
+            except subprocess.TimeoutExpired:
+                return {'success': False, 'error': 'Command timed out after 300s'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+
+        if action == 'save_notes':
+            vmid = params.get('vmid')
+            notes = params.get('notes')
+            kind = params.get('kind', 'ct')
+            if not vmid or not notes:
+                return {'success': False, 'error': 'vmid and notes are required'}
+            path_prefix = '/nodes/' + n + '/lxc/' if kind == 'ct' else '/nodes/' + n + '/qemu/'
+            try:
+                existing = self.pvesh('get', path_prefix + str(vmid) + '/config')
+                old_desc = ''
+                if isinstance(existing, dict):
+                    old_desc = existing.get('description', '')
+                separator = '\n\n---\n' if old_desc else ''
+                new_desc = old_desc + separator + notes
+                self.pvesh('set', path_prefix + str(vmid) + '/config', {'description': new_desc})
+                return {'success': True, 'message': 'Notes saved to ' + ('container' if kind == 'ct' else 'VM') + ' ' + str(vmid)}
             except Exception as e:
                 return {'success': False, 'error': str(e)}
 
@@ -1050,6 +1103,8 @@ class AIProxyHandler(BaseHTTPRequestHandler):
                     emit({'type': 'status', 'message': self._describe_action(action, params)})
                     if action == 'exec_container':
                         result = self._stream_exec(params, emit)
+                    elif action == 'exec_host':
+                        result = self._stream_exec_host(params, emit)
                     else:
                         result = pve.execute(action, params)
                     all_results.append({'action': action, 'result': result})
@@ -1169,7 +1224,7 @@ class AIProxyHandler(BaseHTTPRequestHandler):
         vmid_m = re.search(r'"vmid"\s*:\s*"?(\d+)"?', s)
         if vmid_m:
             params['vmid'] = int(vmid_m.group(1))
-        if action == 'exec_container':
+        if action in ('exec_container', 'exec_host'):
             # Find "command": " then scan to extract the full command value
             cmd_m = re.search(r'"command"\s*:\s*"', s)
             if cmd_m:
@@ -1207,7 +1262,7 @@ class AIProxyHandler(BaseHTTPRequestHandler):
                         'url', 'ostype', 'password', 'ostemplate', 'net0',
                         'content', 'description', 'snapname', 'target', 'disk',
                         'size', 'tags', 'features', 'nameserver', 'searchdomain',
-                        'startup', 'delete', 'net_bridge'):
+                        'startup', 'delete', 'net_bridge', 'notes', 'kind'):
                 km = re.search(r'"' + key + r'"\s*:\s*"([^"]*)"', s)
                 if km:
                     params[key] = km.group(1)
@@ -1285,6 +1340,69 @@ class AIProxyHandler(BaseHTTPRequestHandler):
                 pass
             return {'success': False, 'error': str(e)}
 
+    def _stream_exec_host(self, params, emit):
+        """Stream exec_host output line-by-line via shell events."""
+        command = params.get('command')
+        if not command:
+            return {'success': False, 'error': 'command is required'}
+
+        host_id = 'host'
+        emit({'type': 'shell_start', 'vmid': host_id, 'command': command, 'node': pve.node, 'is_host': True})
+
+        try:
+            proc = subprocess.Popen(
+                ['bash', '-c', command],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            kill_timer = threading.Timer(300, lambda: proc.kill())
+            kill_timer.start()
+
+            output_chunks = []
+            try:
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    output_chunks.append(line)
+                    emit({'type': 'shell_output', 'vmid': host_id, 'output': line})
+            except ConnectionAbortedError:
+                proc.kill()
+                kill_timer.cancel()
+                raise
+            finally:
+                kill_timer.cancel()
+
+            exit_code = proc.wait(timeout=10)
+            emit({'type': 'shell_end', 'vmid': host_id, 'exit_code': exit_code})
+
+            stdout = ''.join(output_chunks)
+            if len(stdout) > 3000:
+                stdout = '...(truncated)...\n' + stdout[-3000:]
+            return {
+                'success': exit_code == 0,
+                'output': stdout,
+                'stderr': '',
+                'exit_code': exit_code,
+            }
+        except ConnectionAbortedError:
+            raise
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            try:
+                emit({'type': 'shell_end', 'vmid': host_id, 'exit_code': -1})
+            except Exception:
+                pass
+            return {'success': False, 'error': 'Command timed out after 300s'}
+        except Exception as e:
+            try:
+                emit({'type': 'shell_end', 'vmid': host_id, 'exit_code': -1})
+            except Exception:
+                pass
+            return {'success': False, 'error': str(e)}
+
     @staticmethod
     def _describe_action(action, params):
         """Human-readable status for a tool action."""
@@ -1345,6 +1463,15 @@ class AIProxyHandler(BaseHTTPRequestHandler):
             return 'Suspending container ' + str(params.get('vmid', '')) + '...'
         if action == 'resume_container':
             return 'Resuming container ' + str(params.get('vmid', '')) + '...'
+        if action == 'exec_host':
+            cmd = params.get('command', '')
+            if len(cmd) > 80:
+                cmd = cmd[:80] + '...'
+            return 'Running on host: ' + cmd
+        if action == 'save_notes':
+            kind = params.get('kind', 'ct')
+            label = 'container' if kind == 'ct' else 'VM'
+            return 'Saving notes to ' + label + ' ' + str(params.get('vmid', '')) + '...'
         return 'Executing ' + action + '...'
 
     def _call_ai(self, model, api_key, messages):

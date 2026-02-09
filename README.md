@@ -16,11 +16,14 @@ curl -sSL https://raw.githubusercontent.com/ProjectProxision/proxision/main/unin
 
 ## Features
 
-- **Container Management**: Create, start, stop, delete LXC containers
+- **Container Management**: Create, start, stop, delete, clone, snapshot, migrate LXC containers
 - **VM Management**: Create VMs with automatic ISO downloading
-- **Command Execution**: Run commands inside containers automatically
+- **Command Execution**: Run commands inside containers and on the Proxmox host
 - **Template Management**: Download and manage container templates
+- **Chat History**: Locally saved chat history with browsable list (localStorage)
+- **Auto Notes**: Important setup info (IPs, credentials) auto-saved to VM/CT notes
 - **Natural Language**: Just describe what you want in plain English
+- **Proxmox Native UI**: Fully themed to match the Proxmox interface
 
 ## Supported AI Providers
 

@@ -25,7 +25,7 @@ NC='\033[0m'
 # Branch / repo configuration
 # Each branch's install.sh sets its own default here.
 # Override with: PROXISION_BRANCH=dev curl ... | bash
-BRANCH="${PROXISION_BRANCH:-main}"
+BRANCH="${PROXISION_BRANCH:-dev}"
 REPO_URL="${PROXISION_REPO:-https://raw.githubusercontent.com/ProjectProxision/proxision/${BRANCH}}"
 
 INSTALL_DIR="/opt/proxision"
@@ -306,7 +306,8 @@ deploy_css() {
 .pve-ai-shell-truncated { color: #666; font-style: italic; font-size: 10px; margin-top: 1px; }
 .pve-ai-shell-exit-err { color: #e06060; font-size: 10.5px; margin-top: 2px; }
 .pve-ai-shell-exit-err i { margin-right: 3px; }
-.pve-ai-shell-cursor { color: #3892d4; font-size: 10px; line-height: 1; }
+.pve-ai-shell-cursor { color: #c0c0c0; font-size: 10px; line-height: 1; animation: pve-ai-blink 1s step-end infinite; }
+@keyframes pve-ai-blink { 50% { opacity: 0; } }
 
 /* Open Shell link in bubble header */
 .pve-ai-shell-open { margin-left: auto; color: #5ba0d0; font-size: 11px; cursor: pointer; padding: 2px 8px; border-radius: 3px; transition: background 0.15s; }
@@ -317,6 +318,9 @@ deploy_css() {
 .pve-ai-stop-btn { background-color: #3892d4 !important; color: #fff !important; border-color: #3078b4 !important; border-radius: 3px; }
 .pve-ai-stop-btn .x-btn-inner { color: #fff !important; }
 .pve-ai-stop-btn .x-btn-icon-el { color: #fff !important; }
+
+/* Chat history items */
+.pve-ai-history-item:hover { background: rgba(56,146,212,0.08); }
 
 /* ─── End Proxision CSS ─── */
 PROXISION_CSS

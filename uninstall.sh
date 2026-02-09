@@ -196,7 +196,7 @@ print_success() {
     echo -e "  ${YELLOW}Hard-refresh your browser${NC} (Ctrl+Shift+R) to clear cached JS/CSS."
     echo ""
     echo -e "  ${BLUE}To reinstall:${NC}"
-    echo "  curl -sSL https://raw.githubusercontent.com/ProjectProxision/proxision/main/install.sh | bash"
+    echo "  curl -sSL https://raw.githubusercontent.com/ProjectProxision/proxision/dev/install.sh | bash"
     echo ""
 }
 
