@@ -720,6 +720,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 			items: [{
 				xtype: 'container',
 				scrollable: { y: 'scroll', x: false },
+				padding: '4 6 4 0',
 				layout: { type: 'vbox', align: 'stretch' },
 				items: items,
 			}],
@@ -784,9 +785,6 @@ Ext.define('PVE.panel.AIChatPanel', {
 				x: false,
 			},
 			cls: 'pve-ai-chat-messages',
-			style: {
-				paddingBottom: '6px',
-			},
 			layout: {
 				type: 'vbox',
 				align: 'stretch',

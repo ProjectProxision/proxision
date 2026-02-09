@@ -259,6 +259,13 @@ deploy_css() {
 
 /* ─── Proxision AI Chat Sidebar ─── DO NOT EDIT ─── */
 
+/* Chat messages container */
+.pve-ai-chat-messages { padding-top: 8px; padding-bottom: 8px; }
+.pve-ai-chat-messages::-webkit-scrollbar { width: 6px; }
+.pve-ai-chat-messages::-webkit-scrollbar-track { background: transparent; }
+.pve-ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+.pve-ai-chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+
 /* Welcome screen */
 .pve-ai-chat-welcome { text-align: center; }
 .pve-ai-chat-welcome-inner h2 { font-size: 16px; font-weight: 600; color: inherit; margin: 10px 0 6px 0; }
@@ -269,7 +276,8 @@ deploy_css() {
 .pve-ai-chat-input-bar { border: none; }
 
 /* Chat bubbles — shared */
-.pve-ai-bubble-wrap { padding: 4px 12px; }
+.pve-ai-bubble-wrap { padding: 4px 14px 4px 12px; }
+.pve-ai-bubble-wrap:first-child { padding-top: 6px; }
 .pve-ai-bubble { padding: 8px 12px; border-radius: 4px; max-width: 92%; word-wrap: break-word; overflow-wrap: break-word; }
 .pve-ai-bubble-header { font-size: 11px; margin-bottom: 4px; opacity: 0.7; display: flex; align-items: center; }
 .pve-ai-bubble-header i { margin-right: 4px; }
@@ -292,7 +300,7 @@ deploy_css() {
 .pve-ai-bubble-body a.pve-ai-link:hover { color: #2a6fa8; border-bottom-style: solid; }
 
 /* Shell preview — nested inside assistant bubble */
-.pve-ai-shell-preview { background: #1e1e1e; border-radius: 4px; overflow: hidden; border: 1px solid rgba(128,128,128,0.2); }
+.pve-ai-shell-preview { background: #1e1e1e; border-radius: 4px; overflow: hidden; border: 1px solid rgba(128,128,128,0.2); margin-top: 2px; }
 .pve-ai-shell-body { padding: 8px 10px; max-height: 200px; overflow-y: auto; overflow-x: hidden; font-family: 'Menlo','Consolas','DejaVu Sans Mono','Liberation Mono',monospace; font-size: 11.5px; line-height: 1.45; }
 .pve-ai-shell-body::-webkit-scrollbar { width: 5px; }
 .pve-ai-shell-body::-webkit-scrollbar-track { background: #1e1e1e; }
@@ -320,6 +328,7 @@ deploy_css() {
 .pve-ai-stop-btn .x-btn-icon-el { color: #fff !important; }
 
 /* Chat history items */
+.pve-ai-history-item { padding-right: 16px !important; }
 .pve-ai-history-item:hover { background: rgba(56,146,212,0.08); }
 
 /* ─── End Proxision CSS ─── */
