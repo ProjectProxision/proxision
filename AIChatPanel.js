@@ -543,6 +543,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 									me.addBubble('assistant', reply);
 									me._saveChatToHistory();
 									me._setProcessing(false);
+									return;
 								} else if (data.type === 'error') {
 									let loadEl = messageArea.down('#' + loadingId);
 									if (loadEl) {
@@ -550,6 +551,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 									}
 									me.addBubble('assistant', 'Error: ' + data.error);
 									me._setProcessing(false);
+									return;
 								}
 							} catch (e) {
 								// ignore malformed lines
@@ -688,7 +690,7 @@ Ext.define('PVE.panel.AIChatPanel', {
 			for (let i = 0; i < chats.length; i++) {
 				(function (chat) {
 					let d = new Date(chat.timestamp);
-					let dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+					let dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 					let msgCount = (chat.messages || []).length;
 					let isActive = me._currentChatId === chat.id;
 					items.push({
